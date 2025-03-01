@@ -26,7 +26,7 @@ func main() {
 
 	var lastMetrics map[string]string
 	sleepTime := 5 * time.Second
-	maxSleepTime := 60 * time.Second
+	// maxSleepTime := 60 * time.Second
 
 	for {
 		currentMetrics := metrics.GetMetrics()
@@ -35,13 +35,16 @@ func main() {
 			if err := client.SendMessage(currentMetrics); err != nil {
 				fmt.Println(err)
 			} else {
-				sleepTime = 5 * time.Second // Reset sleep time
+				// sleepTime = 5 * time.Second // Reset sleep time
 				lastMetrics = currentMetrics
 			}
 		} else {
-			sleepTime = time.Duration(min(int64(sleepTime)*2, int64(maxSleepTime)))
-			fmt.Printf("Sleep time doubled to %v\n", sleepTime)
+			fmt.Printf("no change \n")
 		}
+		// else {
+		// sleepTime = time.Duration(min(int64(sleepTime)*2, int64(maxSleepTime)))
+		// fmt.Printf("Sleep time doubled to %v\n", sleepTime)
+		// }
 
 		time.Sleep(sleepTime)
 	}
