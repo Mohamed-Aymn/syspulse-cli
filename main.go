@@ -40,6 +40,13 @@ func main() {
 		fmt.Println("ID saved successfully:", id)
 	}
 
+	// Fetch stored device ID
+	deviceID, err := identifiers.ReadIDFromFile()
+	if err != nil {
+		fmt.Println("Error retrieving device ID:", err)
+		os.Exit(1)
+	}
+
 	// WebSocket connection
 	wsURL := "ws://localhost:3000"
 	client, err := websocket.NewWebSocketClient(wsURL)
@@ -54,7 +61,7 @@ func main() {
 	sleepTime := 5 * time.Second
 
 	for {
-		currentMetrics := metrics.GetMetrics()
+		currentMetrics := metrics.GetMetrics(deviceID)
 
 		if metrics.HasSignificantChange(lastMetrics, currentMetrics, 5.0) {
 			if err := client.SendMessage(currentMetrics); err != nil {
