@@ -1,22 +1,47 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"time"
 
+	"syspulse-cli/identifiers"
 	"syspulse-cli/metrics"
 	"syspulse-cli/websocket"
 )
 
-func min(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func main() {
-	wsURL := "ws://localhost:8080"
+	key := flag.String("key", "", "provide the key that is generated from the website")
+	flag.Parse()
+
+	if *key == "" {
+		fmt.Println("Error: -key flag is required")
+		os.Exit(1)
+	}
+
+	isNew := !identifiers.IsIDStored()
+
+	// Validate key and capture the response
+	resp, err := identifiers.ValidateKey(*key, isNew)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close() // Ensure response body is closed
+
+	// Fetch and store ID if needed
+	if isNew {
+		id, err := identifiers.FetchAndStoreID(resp)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("ID saved successfully:", id)
+	}
+
+	// WebSocket connection
+	wsURL := "ws://localhost:3000"
 	client, err := websocket.NewWebSocketClient(wsURL)
 	if err != nil {
 		fmt.Printf("WebSocket connection failed: %v\n", err)
@@ -24,27 +49,22 @@ func main() {
 	}
 	defer client.Close()
 
-	var lastMetrics map[string]string
+	// Initialize lastMetrics as an empty map
+	lastMetrics := make(map[string]string)
 	sleepTime := 5 * time.Second
-	// maxSleepTime := 60 * time.Second
 
 	for {
 		currentMetrics := metrics.GetMetrics()
 
-		if lastMetrics == nil || metrics.HasSignificantChange(lastMetrics, currentMetrics, 5.0) {
+		if metrics.HasSignificantChange(lastMetrics, currentMetrics, 5.0) {
 			if err := client.SendMessage(currentMetrics); err != nil {
-				fmt.Println(err)
+				fmt.Println("Error sending WebSocket message:", err)
 			} else {
-				// sleepTime = 5 * time.Second // Reset sleep time
 				lastMetrics = currentMetrics
 			}
 		} else {
-			fmt.Printf("no change \n")
+			fmt.Println("No significant change in metrics.")
 		}
-		// else {
-		// sleepTime = time.Duration(min(int64(sleepTime)*2, int64(maxSleepTime)))
-		// fmt.Printf("Sleep time doubled to %v\n", sleepTime)
-		// }
 
 		time.Sleep(sleepTime)
 	}
