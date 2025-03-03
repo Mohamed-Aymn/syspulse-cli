@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // runCommand executes a shell command and returns the output as a string.
@@ -20,12 +21,13 @@ func runCommand(name string, args ...string) string {
 // GetMetrics retrieves CPU and Memory usage and includes device ID.
 func GetMetrics(deviceID string) map[string]string {
 	commands := map[string][]string{
-		"CPU Usage":    {"sh", "-c", "grep 'cpu ' /proc/stat | awk '{usage=100-($5*100/($2+$3+$4+$5+$6+$7+$8))} END {print usage \"%\"}'"},
-		"Memory Usage": {"sh", "-c", "free | awk '/Mem:/ {print ($3/$2)*100 \"%\"}'"},
+		"cpu":    {"sh", "-c", "grep 'cpu ' /proc/stat | awk '{usage=100-($5*100/($2+$3+$4+$5+$6+$7+$8))} END {print usage}'"},
+		"memory": {"sh", "-c", "free | awk '/Mem:/ {print ($3/$2)*100}'"},
 	}
 
 	metrics := make(map[string]string)
-	metrics["Device ID"] = deviceID // Add device ID to metrics
+	metrics["deviceId"] = deviceID                                  // Add device ID to metrics
+	metrics["timestamp"] = strconv.FormatInt(time.Now().Unix(), 10) // Unix timestamp
 
 	for name, args := range commands {
 		metrics[name] = runCommand(args[0], args[1:]...)
@@ -37,8 +39,8 @@ func GetMetrics(deviceID string) map[string]string {
 // HasSignificantChange checks if there is a significant change in metrics.
 func HasSignificantChange(old, new map[string]string, threshold float64) bool {
 	for key, newValue := range new {
-		// Ignore device ID in comparison
-		if key == "Device ID" {
+		// Ignore device ID and Timestamp in comparison
+		if key == "deviceId" || key == "timestamp" {
 			continue
 		}
 

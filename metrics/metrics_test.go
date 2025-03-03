@@ -10,8 +10,8 @@ import (
 )
 
 func TestHasSignificantChange(t *testing.T) {
-	oldMetrics := map[string]string{"CPU Usage": "20%", "Memory Usage": "30%"}
-	newMetrics := map[string]string{"CPU Usage": "25%", "Memory Usage": "30%"}
+	oldMetrics := map[string]string{"cpu": "20%", "memory": "30%"}
+	newMetrics := map[string]string{"cpu": "25%", "memory": "30%"}
 
 	if !HasSignificantChange(oldMetrics, newMetrics, 4.0) {
 		t.Errorf("Expected significant change but found none")
@@ -41,8 +41,8 @@ func TestCpuIntensiveProcess(t *testing.T) {
 
 	secondaryMetrics := GetMetrics("test-device")
 
-	initialCPU := parseMetric(initialMetrics["CPU Usage"])
-	secondaryCPU := parseMetric(secondaryMetrics["CPU Usage"])
+	initialCPU := parseMetric(initialMetrics["cpu"])
+	secondaryCPU := parseMetric(secondaryMetrics["cpu"])
 
 	t.Logf("Initial CPU Usage: %.2f%%", initialCPU)
 	t.Logf("Secondary CPU Usage: %.2f%%", secondaryCPU)
@@ -84,8 +84,8 @@ func TestMemoryIntensiveProcess(t *testing.T) {
 
 	secondaryMetrics := GetMetrics("test-device")
 
-	initialMem := parseMetric(initialMetrics["Memory Usage"])
-	secondaryMem := parseMetric(secondaryMetrics["Memory Usage"])
+	initialMem := parseMetric(initialMetrics["memory"])
+	secondaryMem := parseMetric(secondaryMetrics["memory"])
 
 	t.Logf("Initial Memory Usage: %.2f%%", initialMem)
 	t.Logf("Secondary Memory Usage: %.2f%%", secondaryMem)
