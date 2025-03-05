@@ -59,17 +59,21 @@ func main() {
 	// Initialize lastMetrics as an empty map
 	lastMetrics := make(map[string]string)
 	sleepTime := 5 * time.Second
+	skipCounter := 0 // the number of times metrics are calculated, skipped and not sent
+	skipLimit := 12  // max number of times to skip sending metrics to the server (n * sleep time = total time)
 
 	for {
 		currentMetrics := metrics.GetMetrics(deviceID)
 
-		if metrics.HasSignificantChange(lastMetrics, currentMetrics, 5.0) {
+		if metrics.HasSignificantChange(lastMetrics, currentMetrics, 5.0) || skipCounter >= skipLimit {
 			if err := client.SendMessage(currentMetrics); err != nil {
 				fmt.Println("Error sending WebSocket message:", err)
 			} else {
 				lastMetrics = currentMetrics
+				skipCounter = 0
 			}
 		} else {
+			skipCounter++
 			fmt.Println("No significant change in metrics.")
 		}
 
