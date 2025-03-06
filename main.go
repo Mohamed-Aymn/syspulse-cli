@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -47,15 +48,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	// WebSocket connection
-	wsURL := "ws://localhost:3000"
-	client, err := websocket.NewWebSocketClient(wsURL)
+	// WebSocket URL with device ID as a query parameter
+	u := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/", RawQuery: "deviceId=" + deviceID}
+	fmt.Printf("Connecting to %s\n", u.String())
+
+	// Establish WebSocket connection
+	client, err := websocket.NewWebSocketClient(u.String())
 	if err != nil {
-		fmt.Printf("WebSocket connection failed: %v\n", err)
+
+		fmt.Printf("WebSocket connection failed:")
+		// log.Fatalf("WebSocket connection failed: %v\n", err)
 		return
 	}
 	defer client.Close()
-
 	// Initialize lastMetrics as an empty map
 	lastMetrics := make(map[string]string)
 	sleepTime := 5 * time.Second
