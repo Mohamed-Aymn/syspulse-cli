@@ -22,6 +22,7 @@ const pidFile = "/tmp/syspulse-cli.pid"
 func main() {
 	// Define flags
 	daemon := flag.Bool("d", false, "Run in background mode")
+	attach := flag.Bool("attach", false, "Run in foreground mode (without detaching)")
 	key := flag.String("key", "", "Provide the key generated from the website")
 	stop := flag.Bool("stop", false, "Stop the running daemon")
 	flag.Parse()
@@ -38,8 +39,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !*daemon {
-		// Relaunch in background
+	// Check if neither `-d` nor `-attach` is provided (default behavior: detach)
+	if !*daemon && !*attach {
+		// Relaunch in background mode
 		cmd := exec.Command(os.Args[0], "-d", "-key", *key) // Re-run with -d flag
 		cmd.Stdout = nil                                    // Hide output
 		cmd.Stderr = nil                                    // Hide errors
@@ -52,7 +54,7 @@ func main() {
 		os.Exit(0) // Exit parent process
 	}
 
-	// Background process starts here
+	// If -attach is provided, run in foreground mode
 	savePID(os.Getpid()) // Save PID for stopping later
 	runApplication(*key)
 
@@ -102,6 +104,7 @@ func stopProcess() {
 func runApplication(key string) {
 	isNew := !identifiers.IsIDStored()
 
+	envCfg := config.ReadEnvConfig() // Load env config (singleton)
 	cfg, err := config.ReadConfig()
 	if err != nil {
 		fmt.Println("Error loading config:", err)
@@ -130,7 +133,13 @@ func runApplication(key string) {
 		os.Exit(1)
 	}
 
-	u := url.URL{Scheme: "ws", Host: cfg.Server.URL, Path: "/", RawQuery: "deviceId=" + deviceID}
+	// Determine protocol based on environment
+	server_url := cfg.Server.URL
+	if envCfg.ENV == "development" {
+		server_url = "localhost:3000"
+	}
+
+	u := url.URL{Scheme: "ws", Host: server_url, Path: "/", RawQuery: "deviceId=" + deviceID}
 	fmt.Printf("Connecting to %s\n", u.String())
 
 	client, err := websocket.NewWebSocketClient(u.String())

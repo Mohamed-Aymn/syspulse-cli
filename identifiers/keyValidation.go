@@ -12,20 +12,22 @@ import (
 // ValidateKey sends a key validation request and returns the response for further processing.
 func ValidateKey(key string, isNew bool) (*http.Response, error) {
 	// Load config (singleton, already cached after first call)
+	envCfg := config.ReadEnvConfig() // Load env config (singleton)
 	cfg, err := config.ReadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("error loading config: %w", err)
 	}
-	envCfg := config.ReadEnvConfig() // Load env config (singleton)
 
 	// Determine protocol based on environment
 	protocol := "https"
+	url := cfg.Server.URL
 	if envCfg.ENV == "development" {
 		protocol = "http"
+		url = "localhost:3000"
 	}
 
 	// Construct URL from config
-	apiURL := fmt.Sprintf("%s://%s/api/keys/validate", protocol, cfg.Server.URL)
+	apiURL := fmt.Sprintf("%s://%s/api/keys/validate", protocol, url)
 
 	// Create request body
 	data := map[string]interface{}{
