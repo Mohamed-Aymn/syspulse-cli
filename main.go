@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"syspulse-cli/config"
 	"syspulse-cli/identifiers"
 	"syspulse-cli/metrics"
 	"syspulse-cli/websocket"
@@ -101,6 +102,12 @@ func stopProcess() {
 func runApplication(key string) {
 	isNew := !identifiers.IsIDStored()
 
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		fmt.Println("Error loading config:", err)
+		return
+	}
+
 	resp, err := identifiers.ValidateKey(key, isNew)
 	if err != nil {
 		fmt.Println(err)
@@ -123,7 +130,7 @@ func runApplication(key string) {
 		os.Exit(1)
 	}
 
-	u := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/", RawQuery: "deviceId=" + deviceID}
+	u := url.URL{Scheme: "ws", Host: cfg.Server.URL, Path: "/", RawQuery: "deviceId=" + deviceID}
 	fmt.Printf("Connecting to %s\n", u.String())
 
 	client, err := websocket.NewWebSocketClient(u.String())

@@ -5,10 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"syspulse-cli/config"
 )
 
 // ValidateKey sends a key validation request and returns the response for further processing.
 func ValidateKey(key string, isNew bool) (*http.Response, error) {
+	// Load config (singleton, already cached after first call)
+	cfg, err := config.ReadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error loading config: %w", err)
+	}
+	envCfg := config.ReadEnvConfig() // Load env config (singleton)
+
+	// Determine protocol based on environment
+	protocol := "https"
+	if envCfg.ENV == "development" {
+		protocol = "http"
+	}
+
+	// Construct URL from config
+	apiURL := fmt.Sprintf("%s://%s/api/keys/validate", protocol, cfg.Server.URL)
+
 	// Create request body
 	data := map[string]interface{}{
 		"key":   key,
@@ -20,7 +38,7 @@ func ValidateKey(key string, isNew bool) (*http.Response, error) {
 	}
 
 	// Send the POST request
-	resp, err := http.Post("http://localhost:3000/api/keys/validate", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(apiURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %w", err)
 	}
