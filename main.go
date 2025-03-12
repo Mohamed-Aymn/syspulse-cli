@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"syspulse-cli/identifiers"
@@ -12,26 +16,98 @@ import (
 	"syspulse-cli/websocket"
 )
 
+const pidFile = "/tmp/syspulse-cli.pid"
+
 func main() {
-	key := flag.String("key", "", "provide the key that is generated from the website")
+	// Define flags
+	daemon := flag.Bool("d", false, "Run in background mode")
+	key := flag.String("key", "", "Provide the key generated from the website")
+	stop := flag.Bool("stop", false, "Stop the running daemon")
 	flag.Parse()
 
+	// Stop the process if -stop is provided
+	if *stop {
+		stopProcess()
+		return
+	}
+
+	// Ensure key is provided for starting the process
 	if *key == "" {
 		fmt.Println("Error: -key flag is required")
 		os.Exit(1)
 	}
 
+	if !*daemon {
+		// Relaunch in background
+		cmd := exec.Command(os.Args[0], "-d", "-key", *key) // Re-run with -d flag
+		cmd.Stdout = nil                                    // Hide output
+		cmd.Stderr = nil                                    // Hide errors
+		cmd.Stdin = nil                                     // Detach from terminal
+		cmd.Start()                                         // Start in the background
+
+		// Save the process ID
+		savePID(cmd.Process.Pid)
+		fmt.Println("Process started in the background. PID:", cmd.Process.Pid)
+		os.Exit(0) // Exit parent process
+	}
+
+	// Background process starts here
+	savePID(os.Getpid()) // Save PID for stopping later
+	runApplication(*key)
+
+	// Cleanup PID file on exit
+	os.Remove(pidFile)
+}
+
+// Saves the process ID to a file
+func savePID(pid int) {
+	f, err := os.Create(pidFile)
+	if err != nil {
+		fmt.Println("Failed to create PID file:", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+	fmt.Fprintln(f, pid)
+}
+
+// Stops the running daemon process
+func stopProcess() {
+	data, err := os.ReadFile(pidFile)
+	if err != nil {
+		fmt.Println("No running process found.")
+		return
+	}
+
+	// Trim any whitespace (including newline)
+	pidStr := string(data)
+	pidStr = strings.TrimSpace(pidStr)
+
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		fmt.Println("Invalid PID file:", err)
+		return
+	}
+
+	// Send SIGTERM to the process
+	err = syscall.Kill(pid, syscall.SIGTERM)
+	if err != nil {
+		fmt.Println("Failed to stop process:", err)
+	} else {
+		fmt.Println("Process stopped successfully.")
+		os.Remove(pidFile)
+	}
+}
+
+func runApplication(key string) {
 	isNew := !identifiers.IsIDStored()
 
-	// Validate key and capture the response
-	resp, err := identifiers.ValidateKey(*key, isNew)
+	resp, err := identifiers.ValidateKey(key, isNew)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close() // Ensure response body is closed
+	defer resp.Body.Close()
 
-	// Fetch and store ID if needed
 	if isNew {
 		id, err := identifiers.FetchAndStoreID(resp)
 		if err != nil {
@@ -41,31 +117,26 @@ func main() {
 		fmt.Println("ID saved successfully:", id)
 	}
 
-	// Fetch stored device ID
 	deviceID, err := identifiers.ReadIDFromFile()
 	if err != nil {
 		fmt.Println("Error retrieving device ID:", err)
 		os.Exit(1)
 	}
 
-	// WebSocket URL with device ID as a query parameter
 	u := url.URL{Scheme: "ws", Host: "localhost:3000", Path: "/", RawQuery: "deviceId=" + deviceID}
 	fmt.Printf("Connecting to %s\n", u.String())
 
-	// Establish WebSocket connection
 	client, err := websocket.NewWebSocketClient(u.String())
 	if err != nil {
-
-		fmt.Printf("WebSocket connection failed:")
-		// log.Fatalf("WebSocket connection failed: %v\n", err)
+		fmt.Println("WebSocket connection failed:", err)
 		return
 	}
 	defer client.Close()
-	// Initialize lastMetrics as an empty map
+
 	lastMetrics := make(map[string]string)
 	sleepTime := 5 * time.Second
-	skipCounter := 0 // the number of times metrics are calculated, skipped and not sent
-	skipLimit := 12  // max number of times to skip sending metrics to the server (n * sleep time = total time)
+	skipCounter := 0
+	skipLimit := 12
 
 	for {
 		currentMetrics := metrics.GetMetrics(deviceID)
