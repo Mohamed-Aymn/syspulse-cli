@@ -135,11 +135,13 @@ func runApplication(key string) {
 
 	// Determine protocol based on environment
 	server_url := cfg.Server.URL
+	sockets_protocol := "wss"
 	if envCfg.ENV == "development" {
 		server_url = "localhost:3000"
+		sockets_protocol = "ws"
 	}
 
-	u := url.URL{Scheme: "ws", Host: server_url, Path: "/", RawQuery: "deviceId=" + deviceID}
+	u := url.URL{Scheme: sockets_protocol, Host: server_url, Path: "/", RawQuery: "deviceId=" + deviceID}
 	fmt.Printf("Connecting to %s\n", u.String())
 
 	client, err := websocket.NewWebSocketClient(u.String())
